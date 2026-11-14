@@ -1,0 +1,7 @@
+version = 1
+host = "::1"
+port = 33603
+storage_dir = "./a-storage"
+chunk_size = 1024
+http_support = true
+
