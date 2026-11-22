@@ -14,9 +14,12 @@ DEFAULT_CHUNK_SIZE = 1024
 class Node:
     special_handle = {}
 
+    def __init__(self, conf):
+        self.conf = conf
+
     def listen(self):
         s = None
-        conf = Config.instance
+        conf = self.conf
         for res in socket.getaddrinfo(conf.get('host'), conf.get('port', DEFAULT_PORT), socket.AF_UNSPEC,
                                       socket.SOCK_STREAM, 0, socket.AI_PASSIVE):
             af, socktype, proto, canonname, sa = res
@@ -65,7 +68,7 @@ class Node:
                             break
 
     def recv_chunked(self, conn, amt):
-        conf = Config.instance
+        conf = self.conf
         chunk_size = conf.get('chunk_size', DEFAULT_CHUNK_SIZE)
         msgdata_l = []
         len_data_read = 0
@@ -83,6 +86,7 @@ class Node:
             conn.send(pack('<H<Q', MsgType.PONG_N2C, 0))
         else:
             conn.send(pack('<H<Q', MsgType.ERROR, 12, b'unknown type'))
+            return True
 
     def http_get(self, conn, msglength):
         conn.send(b"HTTP/1.1 200 OK\nContent-Type: text/html; charset=UTF-8\n\n"

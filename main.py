@@ -34,10 +34,10 @@ def main():
     logger.info('config loaded')
 
     if args.cmd == 'node':
-        node = Node()
+        node = Node(conf)
         node.listen()
     elif args.cmd == 'client':
-        client = Client()
+        client = Client(conf)
         client.cli()
 
 
