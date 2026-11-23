@@ -1,5 +1,7 @@
 # unnamed-distributed-file-replication
 
+**NOTE: only cpython 3.11 and later is supported**
+
 ## todo requirements
 
 0. no voluntarily allowing single points of failure other than the breaking of cryptography

@@ -3,6 +3,7 @@ import logging
 from config import Config
 from node import Node
 from client import Client
+from mplogging import install_mp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ def main():
     logger.info('config loaded')
 
     if args.cmd == 'node':
+        install_mp_handler()
         node = Node(conf)
         node.listen()
     elif args.cmd == 'client':

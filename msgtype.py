@@ -27,3 +27,17 @@ class MsgType:
     AUTH_REJECT = 65534
     ERROR = 65535
 
+    # mappings
+    by_name: dict[str, int] = {}
+    by_value: dict[int, str] = {}
+
+
+# mappings
+
+for attr in dir(MsgType):
+    if attr in ("by_name", "by_value"):
+        continue
+    if not attr.startswith("_"):
+        value = getattr(MsgType, attr)
+        MsgType.by_name[attr] = value
+        MsgType.by_value[value] = attr

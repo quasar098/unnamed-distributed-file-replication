@@ -3,6 +3,9 @@ import typing
 import logging
 import tomllib
 
+DEFAULT_PORT = 33603
+DEFAULT_CHUNK_SIZE = 1024
+
 
 class Config:
     def __init__(self, data: dict[str, typing.Any]):
