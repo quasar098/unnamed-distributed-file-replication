@@ -3,7 +3,7 @@ from struct import unpack, pack
 import logging
 from msgtype import MsgType
 from config import *
-from typing import Optional
+from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +18,18 @@ class Client:
         print("help\nconnect\ndebugsend\nquit\nexit\n")
 
     def cli_connect(self):
-        s = None
         host = input("host > ")
         try:
             port = int(input("port (default 33603) > ") or DEFAULT_PORT)
         except ValueError:
             print("invalid port")
             return
+        self.connect(host, port)
+
+    def connect(self, host: str, port: int):
         logger.debug(f"attempting to connect to host {host} port {port}")
+        s = None
+        sa: Union[tuple[int, int, int, int], tuple[int, int], None] = None
         connect_success = False
         try:
             for res in socket.getaddrinfo(host, port, socket.AF_UNSPEC,

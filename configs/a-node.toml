@@ -1,6 +1,7 @@
 version = 1
+name = "a-node"
 host = "::1"
 port = 33603
-storage_dir = "./a-storage"
+storage_dir = "../storage/a-node/"
 chunk_size = 1024
 http_support = true
