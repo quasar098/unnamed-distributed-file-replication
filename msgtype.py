@@ -24,8 +24,7 @@ class MsgType(IntEnum):
     UPLOAD_FILE_ACK_N2N = 20003
     CHALLENGE_N2N = 20004
     PROOF_N2N = 20005
-    ADD_NODE_N2N = 20006
-    ADD_NODE_ACK_N2N = 20007
+    EXCHANGE_NODES_N2N = 20006
     # todo: announce disconnectedness
 
     # special

@@ -60,20 +60,28 @@ class Client:
     def debug_send_msgtype(self, msgtype: str):
         data = bytes.fromhex(input("data (hex) > "))
         if self.sock.send_chunked(pack(f"<HQ{len(data)}s", MsgType[msgtype], len(data), data)) is None:
-            print("failed to send")
+            if self.sock is not None:
+                logger.error("disconnected from server (failed to send)")
+                self.sock = None
             return
 
         msgtype, msglength = self.sock.recv_msg_header()
         if msgtype is None:
-            print("msgtype is None")
+            if self.sock is not None:
+                logger.error("disconnected from server (msgtype is None)")
+                self.sock = None
             return
         if msglength is None:
-            print("msglength is None")
+            if self.sock is not None:
+                logger.error("disconnected from server (msglength is None)")
+                self.sock = None
             return
 
         data = self.sock.recv_chunked(msglength)
         if data is None:
-            print("incomplete data")
+            if self.sock is not None:
+                logger.error("disconnected from server (incomplete data)")
+                self.sock = None
             return
 
         if msgtype in MsgType._value2member_map_:

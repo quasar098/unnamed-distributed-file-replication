@@ -1,9 +1,6 @@
-import socket
-from struct import unpack, pack
-import logging
-from storage import Storage
+from storage import *
 from textwrap import dedent
-from typing import Union, Optional
+from typing import Union
 from cryptosocket import *
 from msgtype import MsgType
 import html
@@ -20,6 +17,7 @@ def pack_error(errormsg: bytes):
 class Node:
     def __init__(self, conf: Config):
         self.conf: Config = conf
+        self.storage = Storage(self)
 
     def listen(self):
         s: Optional[socket.socket] = None
@@ -57,7 +55,7 @@ class Node:
             logger.info(f'accepted connection from {addr_str} ({f"conn-{conn_counter}"})')
             proc = multiprocessing.Process(
                 target=NodeConnectionHandler.handle_client,
-                args=(conf, conn, addr_str),
+                args=(conf, self.storage.locks, conn, addr_str),
                 daemon=True,
                 name=f"conn-{conn_counter}"
             )
@@ -69,16 +67,17 @@ class Node:
 class NodeConnectionHandler:
     special_handle = {}
 
-    def __init__(self, conf: Config, conn: CryptoSocket, addr_str: str):
+    def __init__(self, conf: Config, locks, conn: CryptoSocket, addr_str: str):
         self.conf: Config = conf
+        self.locks: StorageLocks = locks
         self.conn: CryptoSocket = conn
         self.addr_str: str = addr_str
         if not conf.get("http_support", False):
             del NodeConnectionHandler.special_handle[MsgType.HTTP_GET]
 
     @staticmethod
-    def handle_client(conf, conn: CryptoSocket, addr_str):
-        handler = NodeConnectionHandler(conf, conn, addr_str)
+    def handle_client(conf, locks, conn: CryptoSocket, addr_str):
+        handler = NodeConnectionHandler(conf, locks, conn, addr_str)
         handler.handle_messages()
         logger.info(f'disconnected from {addr_str}')
 
