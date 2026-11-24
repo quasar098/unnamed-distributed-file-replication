@@ -4,6 +4,7 @@ from config import Config
 from node import Node
 from client import Client
 from multiprocess_logging import install_mp_handler
+import multiprocessing
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ def main():
     logger.info('config loaded')
 
     if args.cmd == 'node':
+        multiprocessing.set_start_method("fork")
         install_mp_handler()
         node = Node(conf)
         node.listen()
