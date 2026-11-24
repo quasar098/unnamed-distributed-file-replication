@@ -1,11 +1,8 @@
-import ipaddress
 import typing
-import logging
 from pathlib import Path
 import tomllib
 
 DEFAULT_PORT = 33603
-DEFAULT_CHUNK_SIZE = 1024
 
 
 class Config:
@@ -24,7 +21,7 @@ class Config:
             conf.config_file_path = fpath
             return conf
 
-    def get(self, key, default=None):
+    def get(self, key: str, default=None):
         if key == "storage_dir":
             storage_dir = self._data.get(key, default)
             if storage_dir is None:

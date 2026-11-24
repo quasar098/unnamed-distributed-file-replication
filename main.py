@@ -3,7 +3,7 @@ import logging
 from config import Config
 from node import Node
 from client import Client
-from mplogging import install_mp_handler
+from multiprocess_logging import install_mp_handler
 
 logger = logging.getLogger(__name__)
 
@@ -14,19 +14,17 @@ def main():
 
     nparser = subparsers.add_parser('node')
     nparser.add_argument('config_file')
-    nparser.add_argument('-u', '--unsecure', action='store_true')
     nparser.add_argument('-v', '--verbose', action='store_true')
 
     cparser = subparsers.add_parser('client')
     cparser.add_argument('config_file')
-    cparser.add_argument('-u', '--unsecure', action='store_true')
     cparser.add_argument('-v', '--verbose', action='store_true')
 
     args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(name)s: %(message)s",
+        format="%(asctime)s %(levelname)8s %(name)s: %(message)s",
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     logger.debug('args: %s', args)

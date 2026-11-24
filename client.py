@@ -1,24 +1,25 @@
+from typing import Optional, Union
+from cryptosocket import *
 import socket
 from struct import unpack, pack
 import logging
 from msgtype import MsgType
 from config import *
-from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
 class Client:
-    def __init__(self, conf):
-        self.conf = conf
-        self.sock: Optional[socket.socket] = None
+    def __init__(self, conf: Config):
+        self.conf: Config = conf
+        self.sock: Optional[CryptoSocket] = None
 
     def cli_help(self):
-        print(*MsgType.by_name, sep="\n")
-        print("help\nconnect\ndebugsend\nquit\nexit\n")
+        print(*[msgtype.name for msgtype in MsgType], sep="\n")
+        print("help\nconnect\nquit\nexit\n")
 
     def cli_connect(self):
-        host = input("host > ")
+        host = input("host (default ::1) > ") or "::1"
         try:
             port = int(input("port (default 33603) > ") or DEFAULT_PORT)
         except ValueError:
@@ -36,12 +37,15 @@ class Client:
                                           socket.SOCK_STREAM, 0, 0):
                 af, socktype, proto, canonname, sa = res
                 try:
-                    s = socket.socket(af, socktype, proto)
+                    if self.conf.get("force_insecure_connection", False):
+                        s = InsecureConnection(self.conf, af, socktype, proto)
+                    else:
+                        s = SecureConnection(self.conf, af, socktype, proto)
                     s.settimeout(5)
                     s.connect(sa)
                     connect_success = True
                     break
-                except OSError as msg:
+                except OSError:
                     s = None
                     continue
         except socket.gaierror:
@@ -55,25 +59,25 @@ class Client:
 
     def debug_send_msgtype(self, msgtype: str):
         data = bytes.fromhex(input("data (hex) > "))
-        self.sock.send(pack(f"<HQ{len(data)}s", MsgType.by_name[msgtype], len(data), data))
-        msgtype_b = self.recv_chunked(2)
-        if (not msgtype_b) or len(msgtype_b) < 2:
-            print(f"malformed message type ({msgtype_b})")
+        if self.sock.send_chunked(pack(f"<HQ{len(data)}s", MsgType[msgtype], len(data), data)) is None:
+            print("failed to send")
             return
-        msgtype = unpack("<H", msgtype_b)[0]
-        msglength_b = self.recv_chunked(8)
-        if (not msglength_b) or len(msglength_b) < 8:
-            print(f"malformed message length ({msglength_b})")
-            return
-        msglength = unpack("<Q", msglength_b)[0]
 
-        data = self.recv_chunked(msglength)
+        msgtype, msglength = self.sock.recv_msg_header()
+        if msgtype is None:
+            print("msgtype is None")
+            return
+        if msglength is None:
+            print("msglength is None")
+            return
+
+        data = self.sock.recv_chunked(msglength)
         if data is None:
             print("incomplete data")
             return
 
-        if msgtype in MsgType.by_value:
-            logger.info(f"received msg type {MsgType.by_value[msgtype]} length {msglength}: {data}")
+        if msgtype in MsgType._value2member_map_:
+            logger.info(f"received msg type {MsgType(msgtype).name} length {msglength}: {data}")
         else:
             logger.info(f"received msg type UNKNOWN ({msgtype}) length {msglength}: {data}")
 
@@ -89,26 +93,10 @@ class Client:
                 case "quit" | "exit":
                     running = False
                 case msgtype:
-                    if msgtype in MsgType.by_name:
+                    if msgtype in MsgType.__members__:
                         if self.sock is not None:
                             self.debug_send_msgtype(msgtype)
                         else:
                             print("socket is None")
                     else:
                         print("unrecognized command (use `help` for help)")
-
-    def recv_chunked(self, amt):
-        if amt == 0:
-            return b""
-        conf = self.conf
-        chunk_size = conf.get('chunk_size', DEFAULT_CHUNK_SIZE)
-        msgdata_l = []
-        len_data_read = 0
-        while chunk := self.sock.recv(min(amt-len_data_read, chunk_size)):
-            msgdata_l.append(chunk)
-            len_data_read += len(chunk)
-        if len_data_read == 0:
-            raise ConnectionError("disconnected from node")
-        if len_data_read != amt:
-            return None
-        return b"".join(msgdata_l)

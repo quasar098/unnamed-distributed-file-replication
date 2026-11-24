@@ -1,16 +1,16 @@
 import socket
 from struct import unpack, pack
 import logging
-from typing import Optional, Union
+from storage import Storage
+from textwrap import dedent
+from typing import Union, Optional
+from cryptosocket import *
 from msgtype import MsgType
+import html
 import multiprocessing
 from config import *
 
 logger = logging.getLogger(__name__)
-
-with open("index.html", 'rb') as f:
-    # todo maybe make this configurable or smth
-    default_get_req_html = f.read()
 
 
 def pack_error(errormsg: bytes):
@@ -18,18 +18,21 @@ def pack_error(errormsg: bytes):
 
 
 class Node:
-    def __init__(self, conf):
-        self.conf = conf
+    def __init__(self, conf: Config):
+        self.conf: Config = conf
 
     def listen(self):
-        s = None
+        s: Optional[socket.socket] = None
         sa: Union[tuple[int, int, int, int], tuple[int, int], None] = None
         conf = self.conf
         for res in socket.getaddrinfo(conf.get('host'), conf.get('port', DEFAULT_PORT), socket.AF_UNSPEC,
                                       socket.SOCK_STREAM, 0, socket.AI_PASSIVE):
             af, socktype, proto, canonname, sa = res
             try:
-                s = socket.socket(af, socktype, proto)
+                if conf.get("force_insecure_connection", False):
+                    s = InsecureConnection(conf, af, socktype, proto)
+                else:
+                    s = SecureConnection(conf, af, socktype, proto)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             except OSError:
                 s = None
@@ -47,86 +50,83 @@ class Node:
             logger.critical('could not open socket')
             exit(1)
         logger.info(f'listening on host {sa[0]} port {sa[1]}')
+        conn_counter = 0
         while True:
             conn, addr = s.accept()
             addr_str = f"{addr[0]}:{addr[1]}" if len(addr) == 2 else f"[{addr[0]}]:{addr[1]}"
-            logger.info(f'accepted connection from {addr_str}')
+            logger.info(f'accepted connection from {addr_str} ({f"conn-{conn_counter}"})')
             proc = multiprocessing.Process(
                 target=NodeConnectionHandler.handle_client,
-                args=(conn, addr_str),
-                daemon=True
+                args=(conf, conn, addr_str),
+                daemon=True,
+                name=f"conn-{conn_counter}"
             )
             proc.start()
             conn.close()
+            conn_counter += 1
 
 
 class NodeConnectionHandler:
     special_handle = {}
 
-    def __init__(self, conf, addr_str: str):
-        self.conf = conf
-        self.addr_str = addr_str
+    def __init__(self, conf: Config, conn: CryptoSocket, addr_str: str):
+        self.conf: Config = conf
+        self.conn: CryptoSocket = conn
+        self.addr_str: str = addr_str
+        if not conf.get("http_support", False):
+            del NodeConnectionHandler.special_handle[MsgType.HTTP_GET]
 
     @staticmethod
-    def handle_client(conn, addr_str):
-        self = NodeConnectionHandler(conn, addr_str)
-        with conn:
-            while True:
-                msgtype_b = conn.recv(2)
-                if (not msgtype_b) or len(msgtype_b) < 2: break
-                msgtype = unpack("<H", msgtype_b)[0]
-                msglength_b = conn.recv(8)
-                if (not msglength_b) or len(msglength_b) < 8: break
-                msglength = unpack("<Q", msglength_b)[0]
-
-                if msgtype in MsgType.by_value:
-                    logger.debug(f"received msg type {MsgType.by_value[msgtype]} length {msglength}")
-                else:
-                    logger.debug(f"received msg type UNKNOWN ({msgtype}) length {msglength}")
-
-                # special handling
-                if msgtype in NodeConnectionHandler.special_handle:
-                    if NodeConnectionHandler.special_handle[msgtype](self, conn, msglength):
-                        conn.shutdown(socket.SHUT_WR)
-                        break
-
-                # regular handling
-                if (msgdata := self.recv_chunked(conn, msglength)) is not None:
-                    if self.handle(conn, msgtype, msglength, msgdata):
-                        conn.shutdown(socket.SHUT_WR)
-                        break
-                else:
-                    conn.shutdown(socket.SHUT_WR)
-                    break
+    def handle_client(conf, conn: CryptoSocket, addr_str):
+        handler = NodeConnectionHandler(conf, conn, addr_str)
+        handler.handle_messages()
         logger.info(f'disconnected from {addr_str}')
 
-    def recv_chunked(self, conn, amt):
-        if amt == 0:
-            return b""
-        conf = self.conf
-        chunk_size = conf.get('chunk_size', DEFAULT_CHUNK_SIZE)
-        msgdata_l = []
-        len_data_read = 0
-        while chunk := conn.recv(min(amt-len_data_read, chunk_size)):
-            msgdata_l.append(chunk)
-            len_data_read += len(chunk)
-        if len_data_read == 0:
-            return None
-        if len_data_read != amt:
-            return None
-        return b"".join(msgdata_l)
+    def handle_messages(self):
+        try:
+            with self.conn:
+                while True:
+                    msgtype, msglength = self.conn.recv_msg_header()
+                    if msgtype is None or msglength is None:
+                        break
 
-    def handle(self, conn, msgtype, msglength, msgdata):
+                    # special handling
+                    if msgtype in NodeConnectionHandler.special_handle:
+                        if NodeConnectionHandler.special_handle[msgtype](self, msglength):
+                            self.conn.shutdown(socket.SHUT_WR)
+                            break
+
+                    # regular handling
+                    if (msgdata := self.conn.recv_chunked(msglength)) is not None:
+                        if self.handle(msgtype, msglength, msgdata):
+                            self.conn.shutdown(socket.SHUT_WR)
+                            break
+                    else:
+                        self.conn.shutdown(socket.SHUT_WR)
+                        break
+        except ConnectionResetError as e:
+            logger.info("connection reset by peer")
+
+    def handle(self, msgtype, msglength, msgdata):
         match msgtype:
             case MsgType.PING_C2N:
-                conn.send(pack('<HQ', MsgType.PONG_N2C, 0))
+                if self.conn.send_chunked(pack('<HQ', MsgType.PONG_N2C, 0)) is None:
+                    return True
             case _:
-                conn.send(pack_error(b"unknown type"))
+                self.conn.send(pack_error(b"unknown type"))
                 return True
         return False
 
-    def http_get(self, conn, msglength):
-        conn.send(b"HTTP/1.1 200 OK\nContent-Type: text/html; charset=UTF-8\n\n" + default_get_req_html)
+    def http_get(self, msglength):
+        self.conn.send(dedent(f"""
+        HTTP/1.1 200 OK
+        Content-Type: text/html; charset=UTF-8
+        
+        <h1>node "{html.escape(self.conf.get("name"))}"</h1>
+        <p><a href=\"https://github.com/quasar098/unnamed-distributed-file-replication\">unnamed distributed file replication</a></p>
+        """).strip().encode())
         return True
     special_handle[MsgType.HTTP_GET] = http_get
 
+    def file_upload(self, conn, msglength):
+        pass  # todo

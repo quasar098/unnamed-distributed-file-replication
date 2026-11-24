@@ -1,15 +1,21 @@
-class MsgType:
+from enum import IntEnum
+
+
+class MsgType(IntEnum):
     # c2n
     PING_C2N = 0
     UPLOAD_FILE_C2N = 1
     DOWNLOAD_FILE_C2N = 2
     GET_STATUS_C2N = 3
+    AUTH_C2N = 4
 
     # n2c
     PONG_N2C = 10000
     UPLOAD_FILE_ACK_N2C = 10001
     DOWNLOAD_FILE_N2C = 10002
     GET_STATUS_N2C = 10003
+    AUTH_SUCCESS_N2C = 10004
+    AUTH_FAIL_N2C = 10005
 
     # n2n
     PING_N2N = 20000
@@ -24,20 +30,7 @@ class MsgType:
 
     # special
     HTTP_GET = 17735  # int.from_bytes(b'GE', 'little')
-    AUTH_REJECT = 65534
+    BEGIN_SECURE_CONNECTION = 65532
+    CONFIRM_SECURE_CONNECTION = 65533
+    REJECT_SECURE_CONNECTION = 65534
     ERROR = 65535
-
-    # mappings
-    by_name: dict[str, int] = {}
-    by_value: dict[int, str] = {}
-
-
-# mappings
-
-for attr in dir(MsgType):
-    if attr in ("by_name", "by_value"):
-        continue
-    if not attr.startswith("_"):
-        value = getattr(MsgType, attr)
-        MsgType.by_name[attr] = value
-        MsgType.by_value[value] = attr

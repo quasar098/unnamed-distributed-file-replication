@@ -110,6 +110,7 @@ class MultiProcessingHandler(logging.Handler):
         self.queue.join_thread()
 
     def _send(self, s):
+        s.name = multiprocessing.current_process().name
         self.queue.put_nowait(s)
 
     def _format_record(self, record):
