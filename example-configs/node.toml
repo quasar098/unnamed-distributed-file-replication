@@ -1,0 +1,7 @@
+version = 1
+name = "example-node"
+host = "::1"
+port = 33603
+storage_dir = "../storage/example-node/"
+http_support = true
+force_insecure_connection = false

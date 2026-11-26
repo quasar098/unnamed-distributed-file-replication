@@ -5,11 +5,16 @@ from node import Node
 from client import Client
 from multiprocess_logging import install_mp_handler
 import multiprocessing
+import platform
+
 
 logger = logging.getLogger(__name__)
 
 
 def main():
+    if platform.system() != 'Linux':
+        raise NotImplementedError("currently only Linux is supported")
+
     parser = argparse.ArgumentParser(description='miscellaneous distributed network')
     subparsers = parser.add_subparsers(dest="cmd", required=True)
 

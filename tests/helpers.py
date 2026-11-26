@@ -2,7 +2,6 @@ from client import Client
 from node import listen_new_node_with_conf
 from config import Config
 from textwrap import dedent
-import pytest
 import multiprocessing
 from tempfile import TemporaryDirectory
 

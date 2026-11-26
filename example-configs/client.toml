@@ -1,0 +1,3 @@
+version = 1
+entry_endpoints = ["[::1]:33603"]
+force_insecure_connection = false

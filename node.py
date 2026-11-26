@@ -114,8 +114,8 @@ class NodeConnectionHandler:
 
     def handle(self, msgtype, msglength, msgdata):
         match msgtype:
-            case MsgType.PING_C2N:
-                if self.conn.send_chunked(pack('<HQ', MsgType.PONG_N2C, 0)) is None:
+            case MsgType.PING:
+                if self.conn.send_chunked(pack('<HQ', MsgType.PONG, 0)) is None:
                     return True
             case _:
                 self.conn.send(pack_error(b"unknown type"))
@@ -128,6 +128,7 @@ class NodeConnectionHandler:
         Content-Type: text/html; charset=UTF-8
         
         <h1>node "{html.escape(self.conf.get("name"))}"</h1>
+        <p>version {html.escape(self.conf.get("version"))}</p>
         <p><a href=\"https://github.com/quasar098/unnamed-distributed-file-replication\">unnamed distributed file replication</a></p>
         """).strip().encode())
         return True
