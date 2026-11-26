@@ -9,6 +9,7 @@ class Config:
     def __init__(self, data: dict[str, typing.Any]):
         self._data = data
         self.config_file_path: typing.Optional[str] = None
+        self.ephemeral_storage_dir: typing.Optional[str] = None
 
     @staticmethod
     def load_str(config_txt: str):
@@ -21,9 +22,12 @@ class Config:
             conf.config_file_path = fpath
             return conf
 
+    def set_ephemeral_storage_dir(self, dir_: str):
+        self.ephemeral_storage_dir = dir_
+
     def get(self, key: str, default=None):
         if key == "storage_dir":
-            storage_dir = self._data.get(key, default)
+            storage_dir = self._data.get(key, self.ephemeral_storage_dir or default)
             if storage_dir is None:
                 return storage_dir
             storage_dir = Path(storage_dir)

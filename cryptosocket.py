@@ -52,10 +52,10 @@ class CryptoSocket(socket.socket):
         msgtype, msglength = unpack("<HQ", recved)
         if msgtype in MsgType._value2member_map_:
             logger.debug(f"received msg type {MsgType(msgtype).name} length {msglength}")
+            return MsgType(msgtype), msglength
         else:
             logger.debug(f"received msg type UNKNOWN ({msgtype}) length {msglength}")
-        return MsgType(msgtype), msglength
-
+            return None, None
 
     def recv_chunked(self, amt: int):
         """
@@ -154,29 +154,24 @@ class SecureConnection(CryptoSocket):
                 bob_pq_pub_key_b
             )
             if self.send_chunked(keyderiv_part_1) is None:
-                print("fail1")
                 return 0
 
             # step 3: bob does ecdh and mlkem key decapsulation
             msgtype, msglength = self.recv_msg_header()
             if msgtype is None or msglength is None:
-                print("fail2")
                 return 0
             if msgtype == MsgType.REJECT_SECURE_CONNECTION:
                 logger.warning("peer has refused to encrypt the connection")
                 self.doing_secure_connection_setup = False
                 return super().send(data, flags)
             elif msgtype != MsgType.CONFIRM_SECURE_CONNECTION:
-                print("fail3", msgtype)
                 return 0
             if (msgdata := self.recv_chunked(msglength)) is None:
                 self.doing_secure_connection_setup = False
-                print("fail4")
                 return 0
             alice_ecc_pub_key_b_len, pq_ct_b_len = unpack("<II", msgdata[:8])
             if alice_ecc_pub_key_b_len + pq_ct_b_len != msglength - 8:
                 self.doing_secure_connection_setup = False
-                print("fail5")
                 return 0
             alice_ecc_pub_key_b, pq_ct_b = unpack(f"<{alice_ecc_pub_key_b_len}s{pq_ct_b_len}s", msgdata[8:])
 

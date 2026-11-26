@@ -14,12 +14,16 @@ def pack_error(errormsg: bytes):
     return pack(f"<HQ{len(errormsg)}s", MsgType.ERROR, len(errormsg), errormsg)
 
 
+def listen_new_node_with_conf(conf: Config, start_event):
+    Node(conf).listen(start_event)
+
+
 class Node:
     def __init__(self, conf: Config):
         self.conf: Config = conf
         self.storage = Storage(self)
 
-    def listen(self):
+    def listen(self, start_event = None):
         s: Optional[socket.socket] = None
         sa: Union[tuple[int, int, int, int], tuple[int, int], None] = None
         conf = self.conf
@@ -48,6 +52,8 @@ class Node:
             logger.critical('could not open socket')
             exit(1)
         logger.info(f'listening on host {sa[0]} port {sa[1]}')
+        if start_event is not None:
+            start_event.set()
         conn_counter = 0
         while True:
             conn, addr = s.accept()

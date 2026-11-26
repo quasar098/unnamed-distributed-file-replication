@@ -29,7 +29,7 @@ def main():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     logger.debug('args: %s', args)
-    
+
     conf = Config.load(args.config_file)
     logger.info('config loaded')
 
